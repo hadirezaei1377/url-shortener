@@ -24,6 +24,7 @@ func shortenURLHandler(w http.ResponseWriter, r *http.Request) {
 
 	shortURL := generateShortURL(requestBody.LongURL)
 	saveURL(shortURL, requestBody.LongURL)
+	cacheURL(shortURL, requestBody.LongURL)
 
 	response := map[string]string{"short_url": fmt.Sprintf("http://localhost:8080/%s", shortURL)}
 	json.NewEncoder(w).Encode(response)
@@ -31,11 +32,17 @@ func shortenURLHandler(w http.ResponseWriter, r *http.Request) {
 
 func expandURLHandler(w http.ResponseWriter, r *http.Request) {
 	shortURL := strings.TrimPrefix(r.URL.Path, "/expand/")
-	longURL, found := getOriginalURL(shortURL)
 
+	longURL, found := getURLFromCache(shortURL)
 	if !found {
-		http.Error(w, "URL not found", http.StatusNotFound)
-		return
+
+		longURL, found = getOriginalURL(shortURL)
+		if !found {
+			http.Error(w, "URL not found", http.StatusNotFound)
+			return
+		}
+
+		cacheURL(shortURL, longURL)
 	}
 
 	http.Redirect(w, r, longURL, http.StatusFound)
